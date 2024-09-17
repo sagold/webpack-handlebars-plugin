@@ -367,7 +367,7 @@ class HandlebarsPlugin {
      * @param  {String} outputPath  - webpack output path for build results
      * @param  {Object} compilation  - webpack compilation instance
      */
-    async compileEntryFile (sourcePath, outputPath, compilation) {
+    async compileEntryFile(sourcePath, outputPath, compilation) {
         outputPath = sanitizePath(outputPath);
 
         let rootFolderName = path.dirname(sourcePath);
@@ -381,22 +381,18 @@ class HandlebarsPlugin {
 
         let targetFilepath = this.options.getTargetFilepath(sourcePath, this.options.output, rootFolderName);
         targetFilepath = sanitizePath(targetFilepath);
+
         // fetch template content
         let templateContent = this.readFile(sourcePath, "utf-8");
-        templateContent = this.options.onBeforeCompile(this.HB, templateContent) || templateContent;
+        templateContent = await this.options.onBeforeCompile(this.HB, templateContent) || templateContent;
+
         // create template
         const template = this.HB.compile(templateContent);
-        // cater for possible promises in onBeforeRender
-        const onBeforeRenderIsPromise = typeof this.options.onBeforeRender.then === 'function'
-        const onBeforeRender = this.options.onBeforeRender(this.HB, this.data, sourcePath)
-        const data = onBeforeRenderIsPromise 
-            ? await onBeforeRender
-            : onBeforeRender
-                ? onBeforeRender
-                : this.data
+        const data = await this.options.onBeforeRender(this.HB, this.data, sourcePath) || this.data;
+
         // compile template
         let result = template(data);
-        result = this.options.onBeforeSave(this.HB, result, targetFilepath) || result;
+        result = await this.options.onBeforeSave(this.HB, result, targetFilepath) || result;
 
         if (targetFilepath.includes(outputPath)) {
             // change the destination path relative to webpacks output folder and emit it via webpack
@@ -412,7 +408,7 @@ class HandlebarsPlugin {
             fs.outputFileSync(targetFilepath, result, "utf-8");
         }
 
-        this.options.onDone(this.HB, targetFilepath);
+        await this.options.onDone(this.HB, targetFilepath);
         log(chalk.grey(`created output '${targetFilepath.replace(`${process.cwd()}/`, "")}'`));
     }
 }
